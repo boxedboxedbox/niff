@@ -11,13 +11,11 @@ fn main() {
 
 Read the code if you want to know more.
 
+Note: this is not even close to being ready
+
 # Implementation checklist
 
 Not in any specific order.
-
-' ' = not done,
-x = done,
-k = kinda (done, but thinking if I want to add more features)
 
 ### Lexer
 
@@ -34,7 +32,7 @@ k = kinda (done, but thinking if I want to add more features)
 
 ### Parser
 
-- [k] Functions
+- [ ] Functions
 - [ ] Type system
 - [ ] Control flow
 - [ ] Proper error handling
