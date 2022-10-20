@@ -11,6 +11,8 @@ fn main() {
 
 Read the code if you want to know more.
 
+Note: this is not even close to being ready
+
 # Implementation checklist
 
 Not in any specific order.
