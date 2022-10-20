@@ -73,16 +73,16 @@ pub enum TokenKind {
     Comma,
     /// "."
     Dot,
-    /// '"'
-    Quote,
     /// "'"
-    SingleQuote,
+    Quote,
     /// "var"
     Var,
     /// "fn"
     Fn,
     /// "if"
     If,
+    /// "elif"
+    Elif,
     /// "else"
     Else,
     /// "while"
@@ -96,9 +96,9 @@ pub enum TokenKind {
     /// "const"
     Const,
     /// An integer literal (value)
-    IntegerLiteral(i64), // not sure how I would implement these
+    IntegerLiteral(i64),
     /// A float literal (value)
-    FloatLiteral(f64), // not sure how I would implement these
+    FloatLiteral(f64),
     /// A string literal (data)
     StringLiteral(String),
     /// A char literal (character)
@@ -127,6 +127,7 @@ impl PartialEq for TokenKind {
             (TokenKind::Unknown(_), TokenKind::Unknown(_)) => true,
             (TokenKind::Type(_), TokenKind::Type(_)) => true,
             (TokenKind::IntegerLiteral(_), TokenKind::IntegerLiteral(_)) => true,
+            (TokenKind::FloatLiteral(_), TokenKind::FloatLiteral(_)) => true,
             (TokenKind::StringLiteral(_), TokenKind::StringLiteral(_)) => true,
             _ => matches!(
                 (self, other),
@@ -147,6 +148,11 @@ impl PartialEq for TokenKind {
                     | (TokenKind::RightBrace, TokenKind::RightBrace)
                     | (TokenKind::LeftBracket, TokenKind::LeftBracket)
                     | (TokenKind::RightBracket, TokenKind::RightBracket)
+                    | (TokenKind::Quote, TokenKind::Quote)
+                    | (TokenKind::Caret, TokenKind::Caret)
+                    | (TokenKind::And, TokenKind::And)
+                    | (TokenKind::Pipe, TokenKind::Pipe)
+                    | (TokenKind::Percent, TokenKind::Percent)
                     | (TokenKind::Eof, TokenKind::Eof)
             ),
         }
@@ -299,7 +305,7 @@ pub fn lexer(src: &str) -> Vec<Token> {
                 lexer.advance();
             }
             Some('\'') => {
-                lexer.add_token((TokenKind::SingleQuote, 1).into());
+                lexer.add_token((TokenKind::Quote, 1).into());
                 lexer.advance();
             }
             Some('*') => {
@@ -328,6 +334,22 @@ pub fn lexer(src: &str) -> Vec<Token> {
             }
             Some('-') => {
                 lexer.add_token((TokenKind::Minus, 1).into());
+                lexer.advance();
+            }
+            Some('^') => {
+                lexer.add_token((TokenKind::Caret, 1).into());
+                lexer.advance();
+            }
+            Some('|') => {
+                lexer.add_token((TokenKind::Pipe, 1).into());
+                lexer.advance();
+            }
+            Some('&') => {
+                lexer.add_token((TokenKind::And, 1).into());
+                lexer.advance();
+            }
+            Some('%') => {
+                lexer.add_token((TokenKind::Percent, 1).into());
                 lexer.advance();
             }
             token => {

@@ -33,6 +33,22 @@ pub fn lex_keyword(l: &mut Lexer) -> bool {
         return true;
     }
 
+    // "elif"
+    if l.src.get(l.i) == Some('e').as_ref()
+        && l.src.get(l.i + 1) == Some('l').as_ref()
+        && l.src.get(l.i + 2) == Some('i').as_ref()
+        && l.src.get(l.i + 3) == Some('f').as_ref()
+    {
+        l.advance_with(4);
+
+        l.add_token(Token {
+            kind: TokenKind::Elif,
+            size: 4,
+        });
+
+        return true;
+    }
+
     // "else"
     if l.src.get(l.i) == Some('e').as_ref()
         && l.src.get(l.i + 1) == Some('l').as_ref()
@@ -141,7 +157,6 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(lexer.src[lexer.i], 'm');
     }
-
     #[test]
     fn test_lex_keyword_if() {
         let src = "if(a == b) {}";
@@ -161,7 +176,25 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(lexer.src[lexer.i], '(');
     }
+    #[test]
+    fn test_lex_keyword_elif() {
+        let src = "elif(a == b) {}";
+        let mut lexer = Lexer::new(src);
 
+        lex_keyword(&mut lexer);
+
+        let a = format!("{:?}", lexer.tokens.last().unwrap());
+        let b = format!(
+            "{:?}",
+            Token {
+                kind: TokenKind::Elif,
+                size: 4
+            }
+        );
+
+        assert_eq!(a, b);
+        assert_eq!(lexer.src[lexer.i], '(');
+    }
     #[test]
     fn test_lex_keyword_else() {
         let src = "else {}";
@@ -181,7 +214,6 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(lexer.src[lexer.i], ' ');
     }
-
     #[test]
     fn test_lex_keyword_for() {
         let src = "for(a = 1; b < 2; a++) {}";
