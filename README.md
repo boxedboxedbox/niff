@@ -15,10 +15,6 @@ Read the code if you want to know more.
 
 Not in any specific order.
 
-' ' = not done,
-x = done,
-k = kinda (done, but thinking if I want to add more features)
-
 ### Lexer
 
 - [x] Comments
@@ -34,7 +30,7 @@ k = kinda (done, but thinking if I want to add more features)
 
 ### Parser
 
-- [k] Functions
+- [ ] Functions
 - [ ] Type system
 - [ ] Control flow
 - [ ] Proper error handling
