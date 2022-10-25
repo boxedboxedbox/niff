@@ -139,7 +139,6 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(lexer.src[lexer.i], '2');
     }
-
     #[test]
     fn test_type_i32() {
         let src = " i320";
@@ -161,7 +160,6 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(lexer.src[lexer.i], '0');
     }
-
     #[test]
     fn test_type_u32() {
         let src = " u320";

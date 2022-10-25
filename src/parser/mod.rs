@@ -2,7 +2,6 @@ mod conditionals;
 mod expressions;
 mod functions;
 mod loops;
-mod strings;
 
 use super::lexer::{Lexer, Token, TokenKind};
 use conditionals::*;

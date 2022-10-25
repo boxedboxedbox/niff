@@ -1,4 +1,3 @@
-use super::ParsedToken;
 use crate::lexer::{self, TokenKind};
 
 /// List of tokens used internally.
@@ -9,6 +8,7 @@ enum Token {
     Operator(OpKind),
     LeftParen,
     RightParen,
+    Other(OpKind, Box<Token>, Box<Token>),
 }
 
 impl Token {
@@ -32,6 +32,33 @@ impl Token {
             _ => unimplemented!(),
         }
     }
+    fn is_unary(&self) -> bool {
+        if !self.is_operator() {
+            return false;
+        }
+
+        matches!(
+            self,
+            Self::Operator(OpKind::Add)
+                | Self::Operator(OpKind::Sub)
+                | Self::Operator(OpKind::Mul)
+                | Self::Operator(OpKind::Div)
+                | Self::Operator(OpKind::Mod)
+                | Self::Operator(OpKind::BitXor)
+                | Self::Operator(OpKind::BitAnd)
+                | Self::Operator(OpKind::BitOr)
+        )
+    }
+    fn is_binary(&self) -> bool {
+        if !self.is_operator() {
+            return false;
+        }
+
+        matches!(
+            self,
+            Self::Operator(OpKind::Inc) | Self::Operator(OpKind::Dec)
+        )
+    }
 }
 
 /// List of operator kinds used internally.
@@ -45,6 +72,8 @@ enum OpKind {
     BitAnd,
     BitXor,
     BitOr,
+    Inc,
+    Dec,
 }
 
 /// Is this a number, an identifier or another expression?
@@ -62,6 +91,9 @@ pub enum ExprToken {
     Mul(ExprKind, ExprKind),
     Div(ExprKind, ExprKind),
     Mod(ExprKind, ExprKind),
+    BitXor(ExprKind, ExprKind),
+    BitOr(ExprKind, ExprKind),
+    BitAnd(ExprKind, ExprKind),
     LeftParen,
     RightParen,
     Other(ExprKind),
@@ -164,24 +196,140 @@ fn convert(input: Vec<Token>) -> Vec<Token> {
     output_queue
 }
 
-fn finalize(tokens: Vec<Token>) -> Expression {
-    let res = 0;
-
+fn pack(tokens: Vec<Token>) -> Expression {
     // Idea:
     // "Num(1) Num(2) Add Num(3) Add" turns into
     // -> "Add(Add(Num(1), Num(2)), 3)"
+    //
+    // number => push to stack
+    // unary operator => {
+    //    1. take the last two items from the stack (if some)
+    //    2. if they are literals, preform the operation on them and move on
+    //    3. otherwise append to the stack
+    // }
+    // binary operator => {}
+    let mut values = Vec::new();
+
+    for token in tokens {
+        println!("{:?}", token);
+
+        match token {
+            Token::Num(a) => values.push(Token::Num(a)),
+            token if token.is_unary() => {
+                println!("{:?} is unary", token);
+
+                if let (Some(val0), Some(val1)) = (values.get(0), values.get(1)) {
+                    if let Token::Operator(ref op) = token {
+                        let res = apply(val0, val1, op);
+
+                        values.pop();
+                        values.pop();
+
+                        values.push(res);
+                    }
+                } else {
+                    panic!("not enough values on the stack")
+                }
+
+                println!("asd asd: {:?}, {:?}", token, values);
+            }
+            token if token.is_binary() => println!("{:?} is binary", token),
+            token if token.is_identifier() => values.push(token),
+            token => panic!("{:?}", token),
+        }
+    }
 
     Expression {
-        expr: ExprToken::None,
+        expr: token_to_expr_token(&values[0]),
+    }
+}
+
+fn token_to_expr_token(token: &Token) -> ExprToken {
+    match token {
+        Token::Num(a) => ExprToken::Other(ExprKind::Num(*a)),
+        Token::Other(op, l, r) => match &**l {
+            // we know that r has to be an identifier,
+            // otherwise this would have returned already.
+            // (Both are numbers. If not, that's a bug in apply()).
+            Token::Num(a) => {
+                if let Token::Ident(b) = &**r {
+                    fill(op, ExprKind::Num(*a), ExprKind::Ident(b.to_string()))
+                } else {
+                    panic!("not accepted {:?}", r)
+                }
+            }
+            Token::Ident(a) => match &**r {
+                Token::Ident(b) => fill(
+                    op,
+                    ExprKind::Ident(a.to_string()),
+                    ExprKind::Ident(b.to_string()),
+                ),
+                Token::Num(b) => fill(op, ExprKind::Ident(a.to_string()), ExprKind::Num(*b)),
+                _ => panic!("not accepted {:?}", r),
+            },
+            e => panic!("not accepted {:?}", e),
+        },
+        _ => panic!("not accepted {:?}", token),
+    }
+}
+
+fn fill(op: &OpKind, a: ExprKind, b: ExprKind) -> ExprToken {
+    match *op {
+        OpKind::Add => ExprToken::Add(a, b),
+        OpKind::Sub => ExprToken::Sub(a, b),
+        OpKind::Div => ExprToken::Div(a, b),
+        OpKind::Mul => ExprToken::Mul(a, b),
+        OpKind::Mod => ExprToken::Mod(a, b),
+        OpKind::BitXor => ExprToken::BitXor(a, b),
+        OpKind::BitOr => ExprToken::BitOr(a, b),
+        OpKind::BitAnd => ExprToken::BitAnd(a, b),
+        _ => panic!("not accepted {:?}", op),
+    }
+}
+
+fn apply(l: &Token, r: &Token, op: &OpKind) -> Token {
+    // TODO: get rid of clones
+    match l {
+        Token::Ident(ref a) => match r {
+            Token::Num(ref b) => Token::Other(
+                op.clone(),
+                box Token::Ident(a.to_string()),
+                box Token::Num(*b),
+            ),
+            Token::Ident(ref b) => Token::Other(
+                op.clone(),
+                box Token::Ident(a.to_string()),
+                box Token::Ident(b.to_string()),
+            ),
+            _ => panic!("not accepted {:?}", r),
+        },
+        Token::Num(a) => match r {
+            Token::Num(b) => match op {
+                OpKind::Add => Token::Num(a + b),
+                OpKind::Sub => Token::Num(a - b),
+                OpKind::Mul => Token::Num(a * b),
+                OpKind::Div => Token::Num(a / b),
+                OpKind::Mod => Token::Num(a % b),
+                OpKind::BitXor => Token::Num(a ^ b),
+                OpKind::BitOr => Token::Num(a | b),
+                OpKind::BitAnd => Token::Num(a & b),
+                _ => panic!("not accepted {:?}", op),
+            },
+            Token::Ident(b) => Token::Other(
+                op.clone(),
+                box Token::Num(*a),
+                box Token::Ident(b.to_string()),
+            ),
+            _ => panic!("not accepted {:?}", r),
+        },
+        _ => panic!("not accepted {:?}", l),
     }
 }
 
 pub fn parse_expression(expr: Vec<lexer::Token>) -> Expression {
     let tokens = tokenize(expr);
     let postfix = convert(tokens);
-    let result = finalize(postfix);
-
-    result
+    pack(postfix)
 }
 
 #[cfg(test)]
@@ -228,6 +376,28 @@ mod tests {
         let e1 = "[Num(12), Num(3), Operator(Div)]".to_string();
         let e2 = "[Num(1), Num(2), Operator(Add), Num(3), Operator(Mul)]".to_string();
         let e3 = "[Ident(\"abc\"), Num(3), Operator(Div)]".to_string();
+
+        assert_eq!(o0, e0, "Test case 1 failed");
+        assert_eq!(o1, e1, "Test case 2 failed");
+        assert_eq!(o2, e2, "Test case 3 failed");
+        assert_eq!(o3, e3, "Test case 4 failed");
+    }
+    #[test]
+    fn test_pack() {
+        let i0 = lexer("1 + 2");
+        let i1 = lexer("12 + 3");
+        let i2 = lexer("(1 + 2) * 3");
+        let i3 = lexer("abc + 4");
+
+        let o0 = format!("{:?}", pack(convert(tokenize(i0))));
+        let o1 = format!("{:?}", pack(convert(tokenize(i1))));
+        let o2 = format!("{:?}", pack(convert(tokenize(i2))));
+        let o3 = format!("{:?}", pack(convert(tokenize(i3))));
+
+        let e0 = "Expression { expr: Other(Num(3)) }".to_string();
+        let e1 = "Expression { expr: Other(Num(15)) }".to_string();
+        let e2 = "Expression { expr: Other(Num(9)) }".to_string();
+        let e3 = "Expression { expr: Add(Ident(\"abc\"), Num(4)) }".to_string();
 
         assert_eq!(o0, e0, "Test case 1 failed");
         assert_eq!(o1, e1, "Test case 2 failed");

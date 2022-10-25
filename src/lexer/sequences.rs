@@ -15,7 +15,6 @@ pub fn lex_sequence(l: &mut Lexer) -> bool {
     }
 
     // ".."
-
     if l.src.get(l.i) == Some('.').as_ref() && l.src.get(l.i + 1) == Some('.').as_ref() {
         l.advance_with(2);
 
