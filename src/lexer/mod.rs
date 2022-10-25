@@ -95,6 +95,10 @@ pub enum TokenKind {
     Mut,
     /// "const"
     Const,
+    /// "false"
+    False,
+    /// "true"
+    True,
     /// An integer literal (value)
     IntegerLiteral(i64),
     /// A float literal (value)
@@ -107,6 +111,14 @@ pub enum TokenKind {
     Unknown(String),
     /// "::"
     DoubleColon,
+    /// "=="
+    DoubleEquals,
+    /// "!="
+    BangEquals,
+    /// ">="
+    GtEq,
+    /// "<="
+    LtEq,
     /// ".."
     DoubleDot,
     /// "=>"
@@ -153,6 +165,10 @@ impl PartialEq for TokenKind {
                     | (TokenKind::And, TokenKind::And)
                     | (TokenKind::Pipe, TokenKind::Pipe)
                     | (TokenKind::Percent, TokenKind::Percent)
+                    | (TokenKind::DoubleEquals, TokenKind::DoubleEquals)
+                    | (TokenKind::BangEquals, TokenKind::BangEquals)
+                    | (TokenKind::GtEq, TokenKind::GtEq)
+                    | (TokenKind::LtEq, TokenKind::LtEq)
                     | (TokenKind::Eof, TokenKind::Eof)
             ),
         }

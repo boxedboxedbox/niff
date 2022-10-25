@@ -130,6 +130,43 @@ pub fn lex_keyword(l: &mut Lexer) -> bool {
         return true;
     }
 
+    // "false"
+    // TODO: if you have an identifier "falseasd", it will result in tokens: False and Unknown("asd"),
+    // instead of the intended: Unknown("falseasd")
+    if l.src.get(l.i) == Some('f').as_ref()
+        && l.src.get(l.i + 1) == Some('a').as_ref()
+        && l.src.get(l.i + 2) == Some('l').as_ref()
+        && l.src.get(l.i + 3) == Some('s').as_ref()
+        && l.src.get(l.i + 4) == Some('e').as_ref()
+    {
+        l.advance_with(5);
+
+        l.add_token(Token {
+            kind: TokenKind::False,
+            size: 5,
+        });
+
+        return true;
+    }
+
+    // "true"
+    // TODO: if you have an identifier "trueasd", it will result in tokens: True and Unknown("asd"),
+    // instead of the intended: Unknown("trueasd")
+    if l.src.get(l.i) == Some('t').as_ref()
+        && l.src.get(l.i + 1) == Some('r').as_ref()
+        && l.src.get(l.i + 2) == Some('u').as_ref()
+        && l.src.get(l.i + 3) == Some('e').as_ref()
+    {
+        l.advance_with(4);
+
+        l.add_token(Token {
+            kind: TokenKind::True,
+            size: 4,
+        });
+
+        return true;
+    }
+
     false
 }
 
@@ -289,5 +326,41 @@ mod tests {
 
         assert_eq!(a, b);
         assert_eq!(lexer.src[lexer.i], 's');
+    }
+    #[test]
+    fn test_lex_keyword_false() {
+        let src = "false";
+        let mut lexer = Lexer::new(src);
+
+        lex_keyword(&mut lexer);
+
+        let a = format!("{:?}", lexer.tokens.last().unwrap());
+        let b = format!(
+            "{:?}",
+            Token {
+                kind: TokenKind::False,
+                size: 5
+            }
+        );
+
+        assert_eq!(a, b);
+    }
+    #[test]
+    fn test_lex_keyword_true() {
+        let src = "true";
+        let mut lexer = Lexer::new(src);
+
+        lex_keyword(&mut lexer);
+
+        let a = format!("{:?}", lexer.tokens.last().unwrap());
+        let b = format!(
+            "{:?}",
+            Token {
+                kind: TokenKind::True,
+                size: 4
+            }
+        );
+
+        assert_eq!(a, b);
     }
 }

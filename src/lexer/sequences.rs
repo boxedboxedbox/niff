@@ -2,6 +2,54 @@ use super::{Lexer, Token, TokenKind};
 
 /// Checks for sequences like "::" and "=>".
 pub fn lex_sequence(l: &mut Lexer) -> bool {
+    // "=="
+    if l.src.get(l.i) == Some('=').as_ref() && l.src.get(l.i + 1) == Some('=').as_ref() {
+        l.advance_with(2);
+
+        l.add_token(Token {
+            kind: TokenKind::DoubleEquals,
+            size: 2,
+        });
+
+        return true;
+    }
+
+    // "!="
+    if l.src.get(l.i) == Some('!').as_ref() && l.src.get(l.i + 1) == Some('=').as_ref() {
+        l.advance_with(2);
+
+        l.add_token(Token {
+            kind: TokenKind::BangEquals,
+            size: 2,
+        });
+
+        return true;
+    }
+
+    // ">="
+    if l.src.get(l.i) == Some('>').as_ref() && l.src.get(l.i + 1) == Some('=').as_ref() {
+        l.advance_with(2);
+
+        l.add_token(Token {
+            kind: TokenKind::GtEq,
+            size: 2,
+        });
+
+        return true;
+    }
+
+    // "<="
+    if l.src.get(l.i) == Some('<').as_ref() && l.src.get(l.i + 1) == Some('=').as_ref() {
+        l.advance_with(2);
+
+        l.add_token(Token {
+            kind: TokenKind::LtEq,
+            size: 2,
+        });
+
+        return true;
+    }
+
     // "::"
     if l.src.get(l.i) == Some(':').as_ref() && l.src.get(l.i + 1) == Some(':').as_ref() {
         l.advance_with(2);
@@ -53,6 +101,7 @@ pub fn lex_sequence(l: &mut Lexer) -> bool {
     false
 }
 
+// TODO: write test for every sequence
 #[cfg(test)]
 mod tests {
     use super::super::*;

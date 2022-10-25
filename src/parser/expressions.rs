@@ -4,6 +4,7 @@ use crate::lexer::{self, TokenKind};
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Token {
     Num(i64),
+    Boolean(bool),
     Ident(String),
     Operator(OpKind),
     LeftParen,
@@ -15,6 +16,9 @@ impl Token {
     fn is_number(&self) -> bool {
         matches!(self, Token::Num(_))
     }
+    fn is_boolean(&self) -> bool {
+        matches!(self, Token::Boolean(_))
+    }
     fn is_identifier(&self) -> bool {
         matches!(self, Token::Ident(_))
     }
@@ -24,6 +28,14 @@ impl Token {
     fn precedence(&self) -> u8 {
         // Note to self: Unary operators should have the highest priority
         match self {
+            Self::Operator(OpKind::BitOr) => 3,
+            Self::Operator(OpKind::BitXor) => 4,
+            Self::Operator(OpKind::BitAnd) => 5,
+            Self::Operator(OpKind::Equals) | Self::Operator(OpKind::NotEquals) => 6,
+            Self::Operator(OpKind::Gt)
+            | Self::Operator(OpKind::Lt)
+            | Self::Operator(OpKind::GtEq)
+            | Self::Operator(OpKind::LtEq) => 7,
             Self::Operator(OpKind::Sub) | Self::Operator(OpKind::Add) => 8,
             Self::Operator(OpKind::Div)
             | Self::Operator(OpKind::Mul)
@@ -47,6 +59,12 @@ impl Token {
                 | Self::Operator(OpKind::BitXor)
                 | Self::Operator(OpKind::BitAnd)
                 | Self::Operator(OpKind::BitOr)
+                | Self::Operator(OpKind::Equals)
+                | Self::Operator(OpKind::NotEquals)
+                | Self::Operator(OpKind::GtEq)
+                | Self::Operator(OpKind::LtEq)
+                | Self::Operator(OpKind::Gt)
+                | Self::Operator(OpKind::Lt)
         )
     }
     fn is_binary(&self) -> bool {
@@ -72,6 +90,12 @@ enum OpKind {
     BitAnd,
     BitXor,
     BitOr,
+    Equals,
+    NotEquals,
+    GtEq,
+    LtEq,
+    Gt,
+    Lt,
     Inc,
     Dec,
 }
@@ -80,6 +104,7 @@ enum OpKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExprKind {
     Num(i64),
+    Boolean(bool),
     Ident(String),
     Expr(Box<ExprToken>),
 }
@@ -94,6 +119,14 @@ pub enum ExprToken {
     BitXor(ExprKind, ExprKind),
     BitOr(ExprKind, ExprKind),
     BitAnd(ExprKind, ExprKind),
+    Equals(ExprKind, ExprKind),
+    NotEquals(ExprKind, ExprKind),
+    GtEq(ExprKind, ExprKind),
+    LtEq(ExprKind, ExprKind),
+    Gt(ExprKind, ExprKind),
+    Lt(ExprKind, ExprKind),
+    Inc(ExprKind),
+    Dec(ExprKind),
     LeftParen,
     RightParen,
     Other(ExprKind),
@@ -119,12 +152,20 @@ fn tokenize(input: Vec<lexer::Token>) -> Vec<Token> {
             lexer::TokenKind::Caret => res.push(Token::Operator(OpKind::BitXor)),
             lexer::TokenKind::And => res.push(Token::Operator(OpKind::BitAnd)),
             lexer::TokenKind::Pipe => res.push(Token::Operator(OpKind::BitOr)),
+            lexer::TokenKind::DoubleEquals => res.push(Token::Operator(OpKind::Equals)),
+            lexer::TokenKind::BangEquals => res.push(Token::Operator(OpKind::NotEquals)),
+            lexer::TokenKind::GtEq => res.push(Token::Operator(OpKind::GtEq)),
+            lexer::TokenKind::LtEq => res.push(Token::Operator(OpKind::LtEq)),
+            lexer::TokenKind::GreaterThan => res.push(Token::Operator(OpKind::Gt)),
+            lexer::TokenKind::LessThan => res.push(Token::Operator(OpKind::Lt)),
             lexer::TokenKind::LeftParen => res.push(Token::LeftParen),
             lexer::TokenKind::RightParen => res.push(Token::RightParen),
             token if *token == TokenKind::IntegerLiteral(0) => match token {
                 TokenKind::IntegerLiteral(a) => res.push(Token::Num(*a)),
                 _ => unreachable!(),
             },
+            token if *token == TokenKind::True => res.push(Token::Boolean(true)),
+            token if *token == TokenKind::False => res.push(Token::Boolean(false)),
             token if *token == TokenKind::Unknown("".to_string()) => match token {
                 TokenKind::Unknown(a) => res.push(Token::Ident(a.to_string())),
                 _ => unreachable!(),
@@ -197,27 +238,14 @@ fn convert(input: Vec<Token>) -> Vec<Token> {
 }
 
 fn pack(tokens: Vec<Token>) -> Expression {
-    // Idea:
-    // "Num(1) Num(2) Add Num(3) Add" turns into
-    // -> "Add(Add(Num(1), Num(2)), 3)"
-    //
-    // number => push to stack
-    // unary operator => {
-    //    1. take the last two items from the stack (if some)
-    //    2. if they are literals, preform the operation on them and move on
-    //    3. otherwise append to the stack
-    // }
-    // binary operator => {}
+    // TODO: make work with booleans
     let mut values = Vec::new();
 
     for token in tokens {
-        println!("{:?}", token);
-
         match token {
-            Token::Num(a) => values.push(Token::Num(a)),
+            tok if tok.is_number() => values.push(tok),
+            tok if tok.is_boolean() => values.push(tok),
             token if token.is_unary() => {
-                println!("{:?} is unary", token);
-
                 if let (Some(val0), Some(val1)) = (values.get(0), values.get(1)) {
                     if let Token::Operator(ref op) = token {
                         let res = apply(val0, val1, op);
@@ -230,10 +258,8 @@ fn pack(tokens: Vec<Token>) -> Expression {
                 } else {
                     panic!("not enough values on the stack")
                 }
-
-                println!("asd asd: {:?}, {:?}", token, values);
             }
-            token if token.is_binary() => println!("{:?} is binary", token),
+            token if token.is_binary() => {}
             token if token.is_identifier() => values.push(token),
             token => panic!("{:?}", token),
         }
@@ -247,6 +273,7 @@ fn pack(tokens: Vec<Token>) -> Expression {
 fn token_to_expr_token(token: &Token) -> ExprToken {
     match token {
         Token::Num(a) => ExprToken::Other(ExprKind::Num(*a)),
+        Token::Boolean(a) => ExprToken::Other(ExprKind::Boolean(*a)),
         Token::Other(op, l, r) => match &**l {
             // we know that r has to be an identifier,
             // otherwise this would have returned already.
@@ -273,6 +300,7 @@ fn token_to_expr_token(token: &Token) -> ExprToken {
     }
 }
 
+/// Create an ExprToken from an unary operator `op` filled with `a` and `b`.
 fn fill(op: &OpKind, a: ExprKind, b: ExprKind) -> ExprToken {
     match *op {
         OpKind::Add => ExprToken::Add(a, b),
@@ -283,6 +311,21 @@ fn fill(op: &OpKind, a: ExprKind, b: ExprKind) -> ExprToken {
         OpKind::BitXor => ExprToken::BitXor(a, b),
         OpKind::BitOr => ExprToken::BitOr(a, b),
         OpKind::BitAnd => ExprToken::BitAnd(a, b),
+        OpKind::Equals => ExprToken::Equals(a, b),
+        OpKind::NotEquals => ExprToken::NotEquals(a, b),
+        OpKind::GtEq => ExprToken::GtEq(a, b),
+        OpKind::LtEq => ExprToken::LtEq(a, b),
+        OpKind::Gt => ExprToken::Gt(a, b),
+        OpKind::Lt => ExprToken::Lt(a, b),
+        _ => panic!("not accepted {:?}", op),
+    }
+}
+
+/// Create an ExprToken from an binnary operator `op` filled with `a`.
+fn fill_binary(op: &OpKind, a: ExprKind) -> ExprToken {
+    match *op {
+        OpKind::Inc => ExprToken::Inc(a),
+        OpKind::Dec => ExprToken::Dec(a),
         _ => panic!("not accepted {:?}", op),
     }
 }
@@ -313,6 +356,12 @@ fn apply(l: &Token, r: &Token, op: &OpKind) -> Token {
                 OpKind::BitXor => Token::Num(a ^ b),
                 OpKind::BitOr => Token::Num(a | b),
                 OpKind::BitAnd => Token::Num(a & b),
+                OpKind::Equals => Token::Boolean(a == b),
+                OpKind::NotEquals => Token::Boolean(a != b),
+                OpKind::GtEq => Token::Boolean(a >= b),
+                OpKind::LtEq => Token::Boolean(a <= b),
+                OpKind::Gt => Token::Boolean(a > b),
+                OpKind::Lt => Token::Boolean(a < b),
                 _ => panic!("not accepted {:?}", op),
             },
             Token::Ident(b) => Token::Other(
@@ -343,22 +392,26 @@ mod tests {
         let i1 = lexer("12 / 3");
         let i2 = lexer("(1 + 2) * 3");
         let i3 = lexer("abc / 3");
+        let i4 = lexer("1 == 2");
 
         let t0 = format!("{:?}", tokenize(i0));
         let t1 = format!("{:?}", tokenize(i1));
         let t2 = format!("{:?}", tokenize(i2));
         let t3 = format!("{:?}", tokenize(i3));
+        let t4 = format!("{:?}", tokenize(i4));
 
         let e0 = "[Num(1), Operator(Add), Num(2)]".to_string();
         let e1 = "[Num(12), Operator(Div), Num(3)]".to_string();
         let e2 = "[LeftParen, Num(1), Operator(Add), Num(2), RightParen, Operator(Mul), Num(3)]"
             .to_string();
         let e3 = "[Ident(\"abc\"), Operator(Div), Num(3)]".to_string();
+        let e4 = "[Num(1), Operator(Equals), Num(2)]".to_string();
 
         assert_eq!(t0, e0, "Test case 1 failed");
         assert_eq!(t1, e1, "Test case 2 failed");
         assert_eq!(t2, e2, "Test case 3 failed");
         assert_eq!(t3, e3, "Test case 4 failed");
+        assert_eq!(t4, e4, "Test case 5 failed");
     }
     #[test]
     fn test_convert() {
@@ -366,21 +419,25 @@ mod tests {
         let i1 = lexer("12 / 3");
         let i2 = lexer("(1 + 2) * 3");
         let i3 = lexer("abc / 3");
+        let i4 = lexer("1 == 2");
 
         let o0 = format!("{:?}", convert(tokenize(i0)));
         let o1 = format!("{:?}", convert(tokenize(i1)));
         let o2 = format!("{:?}", convert(tokenize(i2)));
         let o3 = format!("{:?}", convert(tokenize(i3)));
+        let o4 = format!("{:?}", convert(tokenize(i4)));
 
         let e0 = "[Num(1), Num(2), Operator(Add)]".to_string();
         let e1 = "[Num(12), Num(3), Operator(Div)]".to_string();
         let e2 = "[Num(1), Num(2), Operator(Add), Num(3), Operator(Mul)]".to_string();
         let e3 = "[Ident(\"abc\"), Num(3), Operator(Div)]".to_string();
+        let e4 = "[Num(1), Num(2), Operator(Equals)]".to_string();
 
         assert_eq!(o0, e0, "Test case 1 failed");
         assert_eq!(o1, e1, "Test case 2 failed");
         assert_eq!(o2, e2, "Test case 3 failed");
         assert_eq!(o3, e3, "Test case 4 failed");
+        assert_eq!(o4, e4, "Test case 5 failed");
     }
     #[test]
     fn test_pack() {
@@ -388,20 +445,32 @@ mod tests {
         let i1 = lexer("12 + 3");
         let i2 = lexer("(1 + 2) * 3");
         let i3 = lexer("abc + 4");
+        let i4 = lexer("4 + abc");
+        let i5 = lexer("1 == 2");
+        let i6 = lexer("abc != 3");
 
         let o0 = format!("{:?}", pack(convert(tokenize(i0))));
         let o1 = format!("{:?}", pack(convert(tokenize(i1))));
         let o2 = format!("{:?}", pack(convert(tokenize(i2))));
         let o3 = format!("{:?}", pack(convert(tokenize(i3))));
+        let o4 = format!("{:?}", pack(convert(tokenize(i4))));
+        let o5 = format!("{:?}", pack(convert(tokenize(i5))));
+        let o6 = format!("{:?}", pack(convert(tokenize(i6))));
 
         let e0 = "Expression { expr: Other(Num(3)) }".to_string();
         let e1 = "Expression { expr: Other(Num(15)) }".to_string();
         let e2 = "Expression { expr: Other(Num(9)) }".to_string();
         let e3 = "Expression { expr: Add(Ident(\"abc\"), Num(4)) }".to_string();
+        let e4 = "Expression { expr: Add(Num(4), Ident(\"abc\")) }".to_string();
+        let e5 = "Expression { expr: Other(Boolean(false)) }".to_string();
+        let e6 = "Expression { expr: NotEquals(Ident(\"abc\"), Num(3)) }".to_string();
 
         assert_eq!(o0, e0, "Test case 1 failed");
         assert_eq!(o1, e1, "Test case 2 failed");
         assert_eq!(o2, e2, "Test case 3 failed");
         assert_eq!(o3, e3, "Test case 4 failed");
+        assert_eq!(o4, e4, "Test case 5 failed");
+        assert_eq!(o5, e5, "Test case 6 failed");
+        assert_eq!(o6, e6, "Test case 7 failed");
     }
 }
